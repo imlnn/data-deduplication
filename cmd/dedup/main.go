@@ -3,7 +3,7 @@ package main
 import (
 	"dedup/config"
 	"dedup/internal/service/dedup"
-	"dedup/internal/storage/mem"
+	"dedup/internal/storage/fsstorage"
 	"fmt"
 	"log"
 	"os"
@@ -12,11 +12,11 @@ import (
 // Commands format:
 // ./dedup save %FILE_PATH%
 // ./dedup restore %FILE_MARKER%
-
 func main() {
 	cfg := config.LoadConfig("config.json")
-	strg := mem.NewStorage()
-	svc, err := dedup.NewSvc(cfg, strg)
+	batchStorage := fsstorage.NewFSBatchStorage("")
+	occurrencesStorage := fsstorage.NewFSStorage("")
+	svc, err := dedup.NewSvc(cfg, batchStorage, occurrencesStorage)
 	if err != nil {
 		log.Fatal()
 	}
@@ -30,7 +30,12 @@ func main() {
 			return
 		}
 		filePath := args[1]
-		svc.Save(filePath)
+		file, err := svc.Save(filePath)
+		if err != nil {
+			fmt.Printf("Error: %s", err)
+		} else {
+			fmt.Printf("%s", file)
+		}
 
 	case "restore":
 		if len(args) < 2 {
@@ -40,7 +45,9 @@ func main() {
 		fileMarker := args[1]
 		svc.Restore(fileMarker)
 		if err != nil {
-
+			fmt.Printf("Error: %s", err)
+		} else {
+			fmt.Printf("File %s restoration completed ", fileMarker)
 		}
 
 	default:

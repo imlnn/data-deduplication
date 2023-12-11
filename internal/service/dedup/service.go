@@ -3,7 +3,6 @@ package dedup
 import (
 	"dedup/config"
 	"dedup/internal/storage"
-	"dedup/internal/storage/fs"
 	"fmt"
 )
 
@@ -12,16 +11,16 @@ type Svc struct {
 	batchSize        int
 	batchStoragePath string
 	restorationPath  string
-	storage          storage.Storage
-	fsStorage        fs.DiskStorage
+	batchStorage     storage.Storage
+	fsStorage        storage.OccurrenceStorage
 }
 
 type Service interface {
 	Save(path string) (marker string, err error)
-	Restore(marker string)
+	Restore(marker string) (err error)
 }
 
-func NewSvc(cfg *config.Config, storage storage.Storage) (*Svc, error) {
+func NewSvc(cfg *config.Config, batchStorage storage.Storage, fsStorage storage.OccurrenceStorage) (*Svc, error) {
 	const fn = "internal/service/dedup/service/NewSvc"
 
 	alg := getHashAlgorithm(cfg.Alg)
@@ -30,26 +29,11 @@ func NewSvc(cfg *config.Config, storage storage.Storage) (*Svc, error) {
 	}
 
 	svc := Svc{
-		hashFunc:  alg,
-		batchSize: cfg.BatchSize,
-		storage:   storage,
+		hashFunc:     alg,
+		batchSize:    cfg.BatchSize,
+		batchStorage: batchStorage,
+		fsStorage:    fsStorage,
 	}
 
 	return &svc, nil
-}
-
-func (svc *Svc) Save(path string) (marker string, err error) {
-	switch svc.hashFunc {
-	case sha1:
-		marker, err = svc.saveSHA1(path)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return marker, nil
-}
-
-func (svc *Svc) Restore(marker string) {
-
 }

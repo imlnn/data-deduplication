@@ -1,11 +1,11 @@
 package storage
 
-type Storage interface {
+type OccurrenceStorage interface {
 	GetDirectory() string
 	SetDirectory(fileName string)
 
-	Put(hash []byte, batch []byte) error
-	Get(hash []byte) ([]byte, error)
+	Put(hash []byte, occurrence int) error
+	Get(hash []byte) ([]int, error)
 	Delete(hash []byte) error
 	Clean() error
 }
