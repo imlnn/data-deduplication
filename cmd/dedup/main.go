@@ -18,14 +18,32 @@ func main() {
 	cfg := config.LoadConfig("config.json")
 
 	// Create storage instances
-	batchStorage := fsstorage.NewFSBatchStorage("")
-	occurrencesStorage := fsstorage.NewFSStorage("")
-
+	batchStorage := fsstorage.NewFSBatchStorage(cfg.BatchStoragePath)
+	fsOccurrencesStorage := fsstorage.NewFSStorage("occurrences")
 	// Create the deduplication service
-	svc, err := dedup.NewSvc(cfg, batchStorage, occurrencesStorage)
+	svc, err := dedup.NewSvc(cfg, batchStorage, fsOccurrencesStorage)
 	if err != nil {
 		log.Fatalf("[%s] Error creating deduplication service: %s", fn, err)
 	}
+
+	// ==================== DEBUG SECTION ====================
+
+	file, err := svc.Save("test.pdf")
+	if err != nil {
+		log.Printf("[%s] Error saving file: %s", fn, err)
+	} else {
+		log.Printf("[%s] File saved: %s", fn, file)
+	}
+
+	fileMarker := file
+	err = svc.Restore(fileMarker)
+	if err != nil {
+		log.Printf("[%s] Error restoring file: %s", fn, err)
+	} else {
+		log.Printf("[%s] File %s restoration completed", fn, fileMarker)
+	}
+
+	// ==================== DEBUG SECTION ====================
 
 	args := os.Args[1:]
 

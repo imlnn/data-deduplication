@@ -1,6 +1,6 @@
 {
   "alg": "sha1",
   "batchSize": 1024,
-  "batchStoragePath": "./batches",
-  "restorationPath": "./restored"
+  "batchStoragePath": "batches",
+  "restorationPath": "restored"
 }

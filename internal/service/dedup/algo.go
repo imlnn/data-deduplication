@@ -1,10 +1,7 @@
 package dedup
 
 import (
-	MD5 "crypto/md5"
 	SHA1 "crypto/sha1"
-	SHA256 "crypto/sha256"
-	SHA512 "crypto/sha512"
 	"hash"
 	"log"
 )
@@ -40,24 +37,34 @@ func getHashAlgorithm(algoName string) algo {
 	}
 }
 
-func getHashFunc(alg algo) hash.Hash {
+func getHashFunc(alg algo) func() hash.Hash {
 	const fn = "internal/service/dedup/algo/getHashFunc"
 
 	switch alg {
 	case sha1:
 		log.Printf("[%s] Returning SHA-1 hash function", fn)
-		return SHA1.New()
+		return func() hash.Hash {
+			return SHA1.New()
+		}
 	case sha256:
 		log.Printf("[%s] Returning SHA-256 hash function", fn)
-		return SHA256.New()
+		return func() hash.Hash {
+			return SHA1.New()
+		}
 	case sha512:
 		log.Printf("[%s] Returning SHA-512 hash function", fn)
-		return SHA512.New()
+		return func() hash.Hash {
+			return SHA1.New()
+		}
 	case md5:
 		log.Printf("[%s] Returning MD5 hash function", fn)
-		return MD5.New()
+		return func() hash.Hash {
+			return SHA1.New()
+		}
 	default:
-		log.Printf("[%s] Unsupported algorithm: %v. Returning SHA-256 hash function as default", fn, alg)
-		return SHA256.New() // You can change this to another default if necessary.
+		log.Printf("[%s] Unsupported algorithm: %v. Returning SHA-1 hash function as default", fn, alg)
+		return func() hash.Hash {
+			return SHA1.New()
+		}
 	}
 }

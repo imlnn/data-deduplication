@@ -8,12 +8,12 @@ import (
 )
 
 type Svc struct {
-	hashFunc         algo
-	batchSize        int
-	batchStoragePath string
-	restorationPath  string
-	batchStorage     storage.Storage
-	fsStorage        storage.OccurrenceStorage
+	hashFunc           algo
+	batchSize          int
+	batchStoragePath   string
+	restorationPath    string
+	batchStorage       storage.Storage
+	occurrencesStorage storage.OccurrenceStorage
 }
 
 type Service interface {
@@ -35,12 +35,12 @@ func NewSvc(cfg *config.Config, batchStorage storage.Storage, fsStorage storage.
 	}
 
 	svc := Svc{
-		hashFunc:         alg,
-		batchSize:        cfg.BatchSize,
-		batchStorage:     batchStorage,
-		fsStorage:        fsStorage,
-		batchStoragePath: cfg.BatchStoragePath, // You can log other configuration values as needed
-		restorationPath:  cfg.RestorationPath,
+		hashFunc:           alg,
+		batchSize:          cfg.BatchSize,
+		batchStorage:       batchStorage,
+		occurrencesStorage: fsStorage,
+		batchStoragePath:   cfg.BatchStoragePath, // You can log other configuration values as needed
+		restorationPath:    cfg.RestorationPath,
 	}
 
 	// Log the successful creation of the service

@@ -18,8 +18,7 @@ type Config struct {
 func LoadConfig(cfgFileName string) *Config {
 	const fn = "config/config/LoadConfig"
 
-	cfgPath, err := os.Getwd()
-	cfgPath = fmt.Sprintf("%s/%s", cfgPath, cfgFileName)
+	cfgPath := fmt.Sprintf(cfgFileName)
 	log.Printf("Trying to load configuration file at %s", cfgPath)
 	f, err := os.Open(cfgPath)
 	if err != nil {

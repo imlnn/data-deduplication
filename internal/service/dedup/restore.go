@@ -1,11 +1,8 @@
 package dedup
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func (svc *Svc) Restore(marker string) (err error) {
@@ -13,14 +10,7 @@ func (svc *Svc) Restore(marker string) (err error) {
 
 	log.Printf("[%s] Restoring data using marker: %s", fn, marker)
 
-	infoFilePath := fmt.Sprintf("%s/%s/info", svc.fsStorage.GetDirectory(), marker)
-	info, err := os.Open(infoFilePath)
-	if err != nil {
-		log.Fatalf("[%s] Error opening info file: %s", fn, err)
-	}
-	defer info.Close()
-
-	fileName, segmentsNum, err := parseInfoFile(info)
+	fileName, segmentsNum, lastBatchSize, err := svc.occurrencesStorage.GetMetadata()
 	if err != nil {
 		log.Fatalf("[%s] Error parsing info file: %s", fn, err)
 	}
@@ -33,7 +23,7 @@ func (svc *Svc) Restore(marker string) (err error) {
 	}
 	defer resFile.Close()
 
-	fileSize := int64(segmentsNum) * int64(svc.batchSize)
+	fileSize := int64(segmentsNum)*int64(svc.batchSize) + int64(lastBatchSize)
 	err = setFileSize(resFile, fileSize)
 	if err != nil {
 		log.Fatalf("[%s] Error setting result file size: %s", fn, err)
@@ -51,33 +41,6 @@ func (svc *Svc) Restore(marker string) (err error) {
 	return nil
 }
 
-func parseInfoFile(info *os.File) (string, int, error) {
-	const fn = "internal/service/dedup/service/Restore/parseInfoFile"
-
-	log.Printf("[%s] Parsing info file", fn)
-
-	data := make([]byte, 1024) // Adjust buffer size as needed
-	_, err := info.Read(data)
-	if err != nil {
-		return "", 0, err
-	}
-
-	parts := strings.Split(string(data), "\n")
-	if len(parts) != 2 {
-		return "", 0, fmt.Errorf("[%s] Info File format is incorrect", fn)
-	}
-
-	fileName := parts[0]
-	segmentsNum, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return "", 0, fmt.Errorf("[%s] Error parsing number: %s", fn, err)
-	}
-
-	log.Printf("[%s] Parsed info: File: %s, Segments: %d", fn, fileName, segmentsNum)
-
-	return fileName, segmentsNum, nil
-}
-
 func setFileSize(file *os.File, size int64) error {
 	const fn = "internal/service/dedup/service/Restore/setFileSize"
 
@@ -91,7 +54,7 @@ func rewriteSegments(resFile *os.File, marker string, svc *Svc) error {
 
 	log.Printf("[%s] Rewriting segments using marker: %s", fn, marker)
 
-	dir, err := os.Open(marker)
+	dir, err := os.Open(svc.occurrencesStorage.GetDirectory())
 	if err != nil {
 		return err
 	}
@@ -103,11 +66,15 @@ func rewriteSegments(resFile *os.File, marker string, svc *Svc) error {
 	}
 
 	for _, fileInfo := range files {
-		hash := []byte(fileInfo.Name())
+		if fileInfo.Name() == "info" {
+			continue
+		}
+
+		hash := fileInfo.Name()
 
 		log.Printf("[%s] Restoring segment for hash: %x", fn, hash)
 
-		segments, err := svc.fsStorage.Get(hash)
+		segments, err := svc.occurrencesStorage.Get(hash)
 		if err != nil {
 			return err
 		}
