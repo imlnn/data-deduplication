@@ -1,8 +1,11 @@
 package dedup
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
+	"sync"
 )
 
 func (svc *Svc) Restore(marker string) (err error) {
@@ -65,29 +68,90 @@ func rewriteSegments(resFile *os.File, marker string, svc *Svc) error {
 		return err
 	}
 
-	for _, fileInfo := range files {
-		if fileInfo.Name() == "info" {
-			continue
+	if !svc.concurrent {
+		for _, fileInfo := range files {
+			if fileInfo.Name() == "info" {
+				continue
+			}
+
+			hash := fileInfo.Name()
+
+			log.Printf("[%s] Restoring segment for hash: %x", fn, hash)
+
+			segments, err := svc.occurrencesStorage.Get(hash)
+			if err != nil {
+				return err
+			}
+
+			batch, err := svc.batchStorage.Get(hash)
+			if err != nil {
+				return err
+			}
+
+			err = writeSegments(resFile, batch, segments, svc.batchSize)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		const maxGoroutines = 16384
+		var wg sync.WaitGroup
+
+		errCh := make(chan error, 1)
+		semaphore := make(chan struct{}, maxGoroutines)
+		ctx, cancel := context.WithCancel(context.Background())
+
+		for _, fileInfo := range files {
+			if fileInfo.Name() == "info" {
+				continue
+			}
+
+			hash := fileInfo.Name()
+
+			log.Printf("[%s] Restoring segment for hash: %x", fn, hash)
+
+			segments, err := svc.occurrencesStorage.Get(hash)
+			if err != nil {
+				return err
+			}
+
+			batch, err := svc.batchStorage.Get(hash)
+			if err != nil {
+				return err
+			}
+
+			wg.Add(1)
+
+			semaphore <- struct{}{}
+
+			go func() {
+				defer wg.Done()
+				defer func() { <-semaphore }()
+
+				if err := writeSegmentsConcurrent(ctx, resFile, batch, segments, svc.batchSize); err != nil {
+					select {
+					case errCh <- err:
+					default:
+					}
+					cancel()
+				}
+				if err != nil {
+					errCh <- err
+				}
+			}()
 		}
 
-		hash := fileInfo.Name()
+		go func() {
+			wg.Wait()
+			close(errCh)
+		}()
 
-		log.Printf("[%s] Restoring segment for hash: %x", fn, hash)
-
-		segments, err := svc.occurrencesStorage.Get(hash)
-		if err != nil {
-			return err
+		for err := range errCh {
+			fmt.Println("Received error:", err)
 		}
 
-		batch, err := svc.batchStorage.Get(hash)
-		if err != nil {
-			return err
-		}
-
-		err = writeSegments(resFile, batch, segments, svc.batchSize)
-		if err != nil {
-			return err
-		}
+		wg.Wait()
+		fmt.Println("All jobs completed")
 	}
 
 	log.Printf("[%s] Segments rewriting completed", fn)
@@ -99,6 +163,31 @@ func writeSegments(file *os.File, data []byte, segments []int, batchSize int) er
 	const fn = "internal/service/dedup/service/Restore/writeSegments"
 
 	for _, segment := range segments {
+		offset := int64(batchSize * segment)
+		_, err := file.Seek(offset, 0)
+		if err != nil {
+			return err
+		}
+
+		_, err = file.Write(data)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func writeSegmentsConcurrent(ctx context.Context, file *os.File, data []byte, segments []int, batchSize int) error {
+	const fn = "internal/service/dedup/service/Restore/writeSegmentsConcurrent"
+
+	for _, segment := range segments {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
 		offset := int64(batchSize * segment)
 		_, err := file.Seek(offset, 0)
 		if err != nil {

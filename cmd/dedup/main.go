@@ -4,8 +4,10 @@ import (
 	"data-deduplication/config"
 	"data-deduplication/internal/service/dedup"
 	"data-deduplication/internal/storage/fsstorage"
+	"fmt"
 	"log"
 	"os"
+	"time"
 )
 
 // Commands format:
@@ -28,13 +30,17 @@ func main() {
 
 	// ==================== DEBUG SECTION ====================
 
-	file, err := svc.Save("test.pdf")
+	startTime := time.Now()
+
+	file, err := svc.Save("testVIDEO.mp4")
 	if err != nil {
 		log.Printf("[%s] Error saving file: %s", fn, err)
 	} else {
 		log.Printf("[%s] File saved: %s", fn, file)
 	}
+	saveTime := time.Since(startTime)
 
+	startTime = time.Now()
 	fileMarker := file
 	err = svc.Restore(fileMarker)
 	if err != nil {
@@ -42,6 +48,9 @@ func main() {
 	} else {
 		log.Printf("[%s] File %s restoration completed", fn, fileMarker)
 	}
+	restoreTime := time.Since(startTime)
+
+	fmt.Printf("Save time: %s, Restore time: %s", saveTime, restoreTime)
 
 	// ==================== DEBUG SECTION ====================
 

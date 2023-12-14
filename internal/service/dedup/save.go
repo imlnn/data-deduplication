@@ -1,12 +1,14 @@
 package dedup
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"log"
 	"math/big"
 	"os"
+	"sync"
 )
 
 func generateRandomString(length int) (string, error) {
@@ -87,27 +89,96 @@ func (svc *Svc) processFile(f *os.File) (int, int, error) {
 	hashFuncGenerator := getHashFunc(svc.hashFunc)
 	buf := make([]byte, svc.batchSize)
 
-	for i := segments; i > 0; i-- {
-		n, err := f.Read(buf)
-		if err == io.EOF {
-			break
+	if !svc.concurrent {
+		for i := segments; i > 0; i-- {
+			n, err := f.Read(buf)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return 0, 0, fmt.Errorf("error reading file: %w", err)
+			}
+
+			hashFunc := hashFuncGenerator()
+			hash := hashFunc.Sum(buf[:n])[:16]
+
+			if err = svc.batchStorage.Put(hash, buf[:n]); err != nil && err.Error() != "batch already exists" {
+				return 0, 0, fmt.Errorf("error storing batch: %w", err)
+			}
+
+			if err = svc.occurrencesStorage.Put(hash, segments); err != nil {
+				return 0, 0, fmt.Errorf("error storing data: %w", err)
+			}
+
+			segments++
 		}
-		if err != nil {
-			return 0, 0, fmt.Errorf("error reading file: %w", err)
+	} else {
+		const maxGoroutines = 16384
+		var wg sync.WaitGroup
+
+		errCh := make(chan error, 1)
+		semaphore := make(chan struct{}, maxGoroutines)
+		ctx, cancel := context.WithCancel(context.Background())
+
+		for i := segments; i > 0; i-- {
+			n, err := f.Read(buf)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return 0, 0, fmt.Errorf("error reading file: %w", err)
+			}
+
+			wg.Add(1)
+			semaphore <- struct{}{}
+			go func() {
+				defer wg.Done()
+				defer func() { <-semaphore }()
+
+				if err := func(ctx context.Context) error {
+					select {
+					case <-ctx.Done():
+						return nil
+					default:
+					}
+
+					hashFunc := hashFuncGenerator()
+					hash := hashFunc.Sum(buf[:n])[:16]
+
+					if err = svc.batchStorage.Put(hash, buf[:n]); err != nil && err.Error() != "batch already exists" {
+						return fmt.Errorf("error storing batch: %w", err)
+					}
+
+					if err = svc.occurrencesStorage.Put(hash, segments); err != nil {
+						return fmt.Errorf("error storing data: %w", err)
+					}
+
+					return nil
+				}(ctx); err != nil {
+					select {
+					case errCh <- err:
+					default:
+					}
+					cancel()
+				}
+				if err != nil {
+					errCh <- err
+				}
+			}()
+
+			segments++
 		}
 
-		hashFunc := hashFuncGenerator()
-		hash := hashFunc.Sum(buf[:n])[:16]
+		go func() {
+			wg.Wait()
+			close(errCh)
+		}()
 
-		if err = svc.batchStorage.Put(hash, buf[:n]); err != nil && err.Error() != "batch already exists" {
-			return 0, 0, fmt.Errorf("error storing batch: %w", err)
+		for err := range errCh {
+			fmt.Println("Received error:", err)
 		}
 
-		if err = svc.occurrencesStorage.Put(hash, segments); err != nil {
-			return 0, 0, fmt.Errorf("error storing data: %w", err)
-		}
-
-		segments++
+		wg.Wait()
 	}
 
 	startPos := stat.Size() - int64(lastBatchSize)

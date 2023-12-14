@@ -14,6 +14,7 @@ type Svc struct {
 	restorationPath    string
 	batchStorage       storage.Storage
 	occurrencesStorage storage.OccurrenceStorage
+	concurrent         bool
 }
 
 type Service interface {
@@ -41,6 +42,7 @@ func NewSvc(cfg *config.Config, batchStorage storage.Storage, fsStorage storage.
 		occurrencesStorage: fsStorage,
 		batchStoragePath:   cfg.BatchStoragePath, // You can log other configuration values as needed
 		restorationPath:    cfg.RestorationPath,
+		concurrent:         true,
 	}
 
 	// Log the successful creation of the service
