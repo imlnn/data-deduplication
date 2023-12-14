@@ -1,10 +1,9 @@
 package main
 
 import (
-	"dedup/config"
-	"dedup/internal/service/dedup"
-	"dedup/internal/storage/fsstorage"
-	"fmt"
+	"data-deduplication/config"
+	"data-deduplication/internal/service/dedup"
+	"data-deduplication/internal/storage/fsstorage"
 	"log"
 	"os"
 )
@@ -13,44 +12,53 @@ import (
 // ./dedup save %FILE_PATH%
 // ./dedup restore %FILE_MARKER%
 func main() {
+	const fn = "cmd/dedup/main"
+
+	// Load the configuration
 	cfg := config.LoadConfig("config.json")
+
+	// Create storage instances
 	batchStorage := fsstorage.NewFSBatchStorage("")
 	occurrencesStorage := fsstorage.NewFSStorage("")
+
+	// Create the deduplication service
 	svc, err := dedup.NewSvc(cfg, batchStorage, occurrencesStorage)
 	if err != nil {
-		log.Fatal()
+		log.Fatalf("[%s] Error creating deduplication service: %s", fn, err)
 	}
 
 	args := os.Args[1:]
 
+	if len(args) < 1 {
+		log.Fatalf("[%s] Error: Command not provided", fn)
+	}
+
 	switch args[0] {
 	case "save":
 		if len(args) < 2 {
-			fmt.Println("Error: File path not provided")
-			return
+			log.Fatalf("[%s] Error: File path not provided", fn)
 		}
 		filePath := args[1]
 		file, err := svc.Save(filePath)
 		if err != nil {
-			fmt.Printf("Error: %s", err)
+			log.Printf("[%s] Error saving file: %s", fn, err)
 		} else {
-			fmt.Printf("%s", file)
+			log.Printf("[%s] File saved: %s", fn, file)
 		}
 
 	case "restore":
 		if len(args) < 2 {
-			fmt.Println("Error: File marker not provided")
-			return
+			log.Fatalf("[%s] Error: File marker not provided", fn)
 		}
 		fileMarker := args[1]
-		svc.Restore(fileMarker)
+		err := svc.Restore(fileMarker)
 		if err != nil {
-			fmt.Printf("Error: %s", err)
+			log.Printf("[%s] Error restoring file: %s", fn, err)
 		} else {
-			fmt.Printf("File %s restoration completed ", fileMarker)
+			log.Printf("[%s] File %s restoration completed", fn, fileMarker)
 		}
 
 	default:
-		fmt.Println("Error: Unknown command")
+		log.Fatalf("[%s] Error: Unknown command", fn)
 	}
 }
