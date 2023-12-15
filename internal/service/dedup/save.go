@@ -86,7 +86,7 @@ func (svc *Svc) processFile(f *os.File) (int, int, error) {
 
 	segments := int(stat.Size() / int64(svc.batchSize))
 
-	hashFuncGenerator := getHashFunc(svc.hashFunc)
+	hashFuncGenerator := getHashFuncGenerator(svc.hashFunc)
 	buf := make([]byte, svc.batchSize)
 
 	if !svc.concurrent {
