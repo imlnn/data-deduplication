@@ -1,6 +1,6 @@
 {
   "alg": "md5",
-  "batchSize": 8192,
+  "batchSize": 512,
   "batchStoragePath": "batches",
   "restorationPath": "restored"
 }

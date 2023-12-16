@@ -96,6 +96,7 @@ func rewriteSegments(resFile *os.File, marker string, svc *Svc) error {
 	} else {
 		const maxGoroutines = 16384
 		var wg sync.WaitGroup
+		var mu sync.Mutex
 
 		errCh := make(chan error, 1)
 		semaphore := make(chan struct{}, maxGoroutines)
@@ -128,7 +129,7 @@ func rewriteSegments(resFile *os.File, marker string, svc *Svc) error {
 				defer wg.Done()
 				defer func() { <-semaphore }()
 
-				if err := writeSegmentsConcurrent(ctx, resFile, batch, segments, svc.batchSize); err != nil {
+				if err := writeSegmentsConcurrent(ctx, &mu, resFile, batch, segments, svc.batchSize); err != nil {
 					select {
 					case errCh <- err:
 					default:
@@ -178,7 +179,7 @@ func writeSegments(file *os.File, data []byte, segments []int, batchSize int) er
 	return nil
 }
 
-func writeSegmentsConcurrent(ctx context.Context, file *os.File, data []byte, segments []int, batchSize int) error {
+func writeSegmentsConcurrent(ctx context.Context, mu *sync.Mutex, file *os.File, data []byte, segments []int, batchSize int) error {
 	const fn = "internal/service/dedup/service/Restore/writeSegmentsConcurrent"
 
 	for _, segment := range segments {
@@ -188,6 +189,7 @@ func writeSegmentsConcurrent(ctx context.Context, file *os.File, data []byte, se
 		default:
 		}
 
+		mu.Lock()
 		offset := int64(batchSize * segment)
 		_, err := file.Seek(offset, 0)
 		if err != nil {
@@ -198,6 +200,7 @@ func writeSegmentsConcurrent(ctx context.Context, file *os.File, data []byte, se
 		if err != nil {
 			return err
 		}
+		mu.Unlock()
 	}
 
 	return nil

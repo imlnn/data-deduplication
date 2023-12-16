@@ -106,11 +106,9 @@ func (svc *Svc) processFile(f *os.File) (int, int, error) {
 				return 0, 0, fmt.Errorf("error storing batch: %w", err)
 			}
 
-			if err = svc.occurrencesStorage.Put(hash, segments); err != nil {
+			if err = svc.occurrencesStorage.Put(hash, segments-i); err != nil {
 				return 0, 0, fmt.Errorf("error storing data: %w", err)
 			}
-
-			segments++
 		}
 	} else {
 		const maxGoroutines = 16384
@@ -131,7 +129,7 @@ func (svc *Svc) processFile(f *os.File) (int, int, error) {
 
 			wg.Add(1)
 			semaphore <- struct{}{}
-			go func() {
+			go func(buf []byte) {
 				defer wg.Done()
 				defer func() { <-semaphore }()
 
@@ -149,7 +147,7 @@ func (svc *Svc) processFile(f *os.File) (int, int, error) {
 						return fmt.Errorf("error storing batch: %w", err)
 					}
 
-					if err = svc.occurrencesStorage.Put(hash, segments); err != nil {
+					if err = svc.occurrencesStorage.Put(hash, segments-i); err != nil {
 						return fmt.Errorf("error storing data: %w", err)
 					}
 
@@ -164,9 +162,7 @@ func (svc *Svc) processFile(f *os.File) (int, int, error) {
 				if err != nil {
 					errCh <- err
 				}
-			}()
-
-			segments++
+			}(buf)
 		}
 
 		go func() {

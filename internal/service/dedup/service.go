@@ -42,7 +42,7 @@ func NewSvc(cfg *config.Config, batchStorage storage.Storage, fsStorage storage.
 		occurrencesStorage: fsStorage,
 		batchStoragePath:   cfg.BatchStoragePath, // You can log other configuration values as needed
 		restorationPath:    cfg.RestorationPath,
-		concurrent:         true,
+		concurrent:         false,
 	}
 
 	// Log the successful creation of the service
