@@ -1,6 +1,1 @@
-{
-  "alg": "md5",
-  "batchSize": 512,
-  "batchStoragePath": "batches",
-  "restorationPath": "restored"
-}
+{"alg": "sha512", "batchSize": 8192, "batchStoragePath": "batches", "restorationPath": "restored"}
