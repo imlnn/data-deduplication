@@ -13,6 +13,7 @@ func (svc *Svc) Restore(marker string) (err error) {
 
 	log.Printf("[%s] Restoring data using marker: %s", fn, marker)
 
+	svc.occurrencesStorage.SetWD(marker)
 	fileName, segmentsNum, lastBatchSize, err := svc.occurrencesStorage.GetMetadata()
 	if err != nil {
 		log.Fatalf("[%s] Error parsing info file: %s", fn, err)

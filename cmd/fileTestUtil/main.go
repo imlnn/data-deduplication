@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	f1, _ := os.Open("testVIDEO.mp4")
-	f2, _ := os.Open("DEDUP_testVIDEO.mp4")
+	f1, _ := os.Open("test.txt")
+	f2, _ := os.Open("DEDUP_test.txt")
 
 	stat1, _ := f1.Stat()
 	stat2, _ := f2.Stat()
