@@ -62,7 +62,7 @@ def change_alg_config(alg):
 
 def run_dedup(alg, time_list, diff_list):
     change_alg_config(alg)
-
+    print('--- ', alg, ' ---')
     start_save = datetime.datetime.now()
     test_save_file(get_root_path(), PATH_TO_FILE)
     finish_save = datetime.datetime.now()
